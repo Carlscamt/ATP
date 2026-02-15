@@ -1,0 +1,68 @@
+xgboost:
+  tree_method: hist
+  device: cuda
+  objective: "binary:logistic"
+  scale_pos_weight: auto  # calculated from data
+  max_delta_step: 5
+  learning_rate: 0.01
+  max_depth: 6
+  min_child_weight: 1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  eval_metric:
+    - aucpr
+    - logloss
+  num_boost_round: 1000
+  early_stopping_rounds: 50
+
+elo:
+  initial_rating: 1500
+  blend_ratio: 0.5
+  k_factors:
+    grand_slam: 32
+    masters: 24
+    atp_500: 20
+    atp_250: 16
+
+features:
+  ema_alpha: 0.3
+  rolling_windows: [5, 10, 22]
+
+betting:
+  kelly_fraction: 0.25
+  max_stake_pct: 0.05
+  min_precision: 0.55
+  min_odds: 1.5
+  max_odds: 10.0
+
+backtesting:
+  initial_bankroll: 10000
+  train_start: "2019-01-01"
+  test_start: "2024-01-01"
+
+scraping:
+  rate_limit_seconds: 1.0
+  max_retries: 5
+  backoff_base: 2
+  batch_size: 1000
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+paths:
+  raw_matches: "data/raw/matches.parquet"
+  processed_features: "data/processed/features.parquet"
+  elo_history: "data/elo/ratings_history.parquet"
+  player_mapping: "data/processed/player_mapping.parquet"
+  upcoming_matches: "data/upcoming/matches.parquet"
+  upcoming_odds: "data/upcoming/odds.parquet"
+  predictions_dir: "data/predictions"
+  folds_dir: "data/folds"
+
+mlflow:
+  experiment_name: "atp_betting_model"
+  tracking_uri: "mlruns"
+  model_name: "ATP_XGBoost"
+
+optuna:
+  n_trials: 100
+  timeout: 3600
+  direction: maximize

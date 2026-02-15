@@ -1,0 +1,87 @@
+name: ATP Betting Model CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 12 * * 1'  # Weekly retrain: Monday at noon UTC
+
+jobs:
+  # -----------------------------------------------
+  # 1. Test
+  # -----------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v --cov=. --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+
+  # -----------------------------------------------
+  # 2. Lint
+  # -----------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install ruff
+      - run: ruff check .
+
+  # -----------------------------------------------
+  # 3. Weekly Retrain (scheduled only)
+  # -----------------------------------------------
+  retrain:
+    needs: test
+    runs-on: self-hosted  # Requires GPU runner
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper (update data)
+        run: python -m scraper.atp_scraper 2024
+
+      - name: Feature engineering
+        run: python -m data.processor
+
+      - name: Split data
+        run: python -m data.splitter
+
+      - name: Quality checks
+        run: python -m data.quality_checks data/processed/features.parquet
+
+      - name: Train model
+        run: python -m model.xgboost_trainer
+
+      - name: Health check
+        run: python -m monitor.alerts
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xgboost-model
+          path: model/xgboost_model.json
